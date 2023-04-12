@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using TallerMecanico.Filters;
 using TallerMecanico.Models.Domain;
@@ -170,5 +171,42 @@ namespace TallerMecanico.Controllers
 
             return RedirectToAction("Index");
         }
+
+        [HttpGet]
+        [ClaimRequirement("Usuario")]
+        public IActionResult ExportarExcel()
+        {
+            var ListaUsuarios = _context.Usuario.Where(w => w.Eliminado == false).ProjectToType<UsuarioVm>().ToList();
+            DataTable dt = Utilidades.Utilidades.ConvertToDataTable(ListaUsuarios);
+
+            string filename = "Usuarios.xlsx";
+            string filepath = $"{AppDomain.CurrentDomain.BaseDirectory}\\{filename}";
+
+            // Creamos una instancia de Excel
+            Microsoft.Office.Interop.Excel.Application excel = new Microsoft.Office.Interop.Excel.Application();
+            excel.Visible = false;
+            Microsoft.Office.Interop.Excel.Workbook workbook = excel.Workbooks.Add(System.Reflection.Missing.Value);
+            Microsoft.Office.Interop.Excel.Worksheet sheet = (Microsoft.Office.Interop.Excel.Worksheet)workbook.ActiveSheet;
+
+            // Copiamos los datos de la tabla al archivo de Excel
+            for (int i = 0; i < dt.Rows.Count; i++)
+            {
+                for (int j = 0; j < dt.Columns.Count; j++)
+                {
+                    sheet.Cells[i + 1, j + 1] = dt.Rows[i][j].ToString();
+                }
+            }
+
+            // Guardamos el archivo y lo descargamos al usuario
+            workbook.SaveAs(filepath);
+            workbook.Close();
+            excel.Quit();
+
+            byte[] fileBytes = System.IO.File.ReadAllBytes(filepath);
+            System.IO.File.Delete(filepath);
+
+            return File(fileBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", filename);
+        }
+
     }
 }
